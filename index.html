@@ -131,19 +131,6 @@
       <p id="no-entries" class="text-gray-400 text-sm text-center py-4">No entries yet. Log your first weight above.</p>
     </div>
 
-    <!-- Notification Toggle -->
-    <div class="card md:col-span-2">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-semibold text-gray-700">Daily Reminder</h2>
-          <p class="text-sm text-gray-500">Get a notification at 7:00 AM to log your weight</p>
-        </div>
-        <label class="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" id="notify-toggle" class="sr-only peer">
-          <div class="w-11 h-6 bg-gray-300 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-        </label>
-      </div>
-    </div>
   </main>
 
   <footer class="max-w-5xl mx-auto mt-8 mb-4 text-center text-xs text-gray-400">
@@ -155,7 +142,6 @@
   const STORAGE_KEY = 'weightTrackerEntries';
   const GOAL_KEY = 'weightTrackerGoal';
   const HEIGHT_KEY = 'weightTrackerHeight';
-  const NOTIFY_KEY = 'weightTrackerNotify';
 
   function loadEntries() {
     try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -361,45 +347,6 @@
     a.click();
     URL.revokeObjectURL(a.href);
   });
-
-  // ---- Notifications ----
-  const notifyToggle = document.getElementById('notify-toggle');
-  let notifyInterval = null;
-
-  notifyToggle.checked = localStorage.getItem(NOTIFY_KEY) === 'true';
-
-  notifyToggle.addEventListener('change', function() {
-    if (this.checked) {
-      if (!('Notification' in window)) { alert('Notifications not supported in this browser.'); this.checked = false; return; }
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') {
-          localStorage.setItem(NOTIFY_KEY, 'true');
-          startNotifyCheck();
-        } else {
-          this.checked = false;
-          localStorage.setItem(NOTIFY_KEY, 'false');
-        }
-      });
-    } else {
-      localStorage.setItem(NOTIFY_KEY, 'false');
-      clearInterval(notifyInterval);
-    }
-  });
-
-  function startNotifyCheck() {
-    clearInterval(notifyInterval);
-    let lastNotifyDate = null;
-    notifyInterval = setInterval(() => {
-      const now = new Date();
-      const today = now.toISOString().slice(0, 10);
-      if (now.getHours() === 7 && now.getMinutes() === 0 && lastNotifyDate !== today) {
-        lastNotifyDate = today;
-        new Notification('Weight Tracker', { body: 'Time to log your weight!' });
-      }
-    }, 30000);
-  }
-
-  if (notifyToggle.checked && Notification.permission === 'granted') startNotifyCheck();
 
   // ---- Init ----
   document.getElementById('entry-date').valueAsDate = new Date();
