@@ -109,6 +109,17 @@
       <canvas id="weight-chart"></canvas>
     </div>
 
+    <!-- Import Data -->
+    <div class="card md:col-span-2">
+      <h2 class="text-lg font-semibold text-gray-700 mb-2">Import Data</h2>
+      <p class="text-sm text-gray-500 mb-3">Paste your notes below — one entry per line. Supports formats like "1/15 185.2", "Jan 16 184.8", "2025-01-17 185.0"</p>
+      <textarea id="import-text" rows="5" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="1/15 185.2&#10;1/16 184.8&#10;Jan 17 185.0"></textarea>
+      <div class="flex items-center gap-3 mt-3">
+        <button id="import-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition text-sm">Import</button>
+        <span id="import-status" class="text-sm"></span>
+      </div>
+    </div>
+
     <!-- Data Table -->
     <div class="card md:col-span-2">
       <div class="flex justify-between items-center mb-4">
@@ -334,6 +345,66 @@
     saveEntries(entries);
     renderAll();
   }
+
+  // ---- Import ----
+  const MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+
+  function parseDate(str) {
+    // ISO: 2025-01-15
+    let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+    // MM/DD/YYYY or MM/DD/YY
+    m = str.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+    if (m) {
+      let y = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : new Date().getFullYear();
+      return new Date(y, +m[1]-1, +m[2]);
+    }
+    // Mon DD YYYY or Mon DD
+    m = str.match(/^([a-z]+)\s+(\d{1,2})(?:[\s,]+(\d{2,4}))?$/i);
+    if (m && MONTHS[m[1].slice(0,3).toLowerCase()] !== undefined) {
+      let y = m[3] ? (+m[3] < 100 ? 2000 + +m[3] : +m[3]) : new Date().getFullYear();
+      return new Date(y, MONTHS[m[1].slice(0,3).toLowerCase()], +m[2]);
+    }
+    return null;
+  }
+
+  function parseLine(line) {
+    line = line.trim();
+    if (!line) return null;
+    // Find the weight: last number in the line (possibly decimal)
+    const nums = [...line.matchAll(/[\d]+\.?\d*/g)];
+    if (nums.length === 0) return null;
+    const weight = parseFloat(nums[nums.length - 1][0]);
+    if (isNaN(weight) || weight < 50 || weight > 999) return null;
+    // Everything before the weight is the date
+    const weightStart = nums[nums.length - 1].index;
+    const datePart = line.slice(0, weightStart).replace(/[:\-–—]+$/, '').trim();
+    if (!datePart) return null;
+    const date = parseDate(datePart);
+    if (!date || isNaN(date.getTime())) return null;
+    const iso = date.toISOString().slice(0, 10);
+    return { date: iso, weight };
+  }
+
+  document.getElementById('import-btn').addEventListener('click', function() {
+    const text = document.getElementById('import-text').value;
+    const lines = text.split('\n');
+    const entries = loadEntries();
+    let added = 0, skipped = 0;
+    for (const line of lines) {
+      const parsed = parseLine(line);
+      if (!parsed) { if (line.trim()) skipped++; continue; }
+      const existing = entries.findIndex(e => e.date === parsed.date);
+      if (existing !== -1) entries[existing].weight = parsed.weight;
+      else entries.push(parsed);
+      added++;
+    }
+    saveEntries(entries);
+    const status = document.getElementById('import-status');
+    status.textContent = `Imported ${added} entries` + (skipped ? `, ${skipped} lines skipped` : '');
+    status.className = 'text-sm ' + (added > 0 ? 'text-green-600' : 'text-red-500');
+    if (added > 0) { document.getElementById('import-text').value = ''; renderAll(); }
+  });
 
   // ---- CSV Export ----
   document.getElementById('export-btn').addEventListener('click', function() {
